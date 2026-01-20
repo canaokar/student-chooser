@@ -7,8 +7,10 @@ export default function Home() {
   const [students, setStudents] = useState<string[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [showResult, setShowResult] = useState(false);
   const [bulkInput, setBulkInput] = useState("");
   const [selectCount, setSelectCount] = useState(1);
+  const [highlightedStudent, setHighlightedStudent] = useState<string | null>(null);
 
   const importStudents = () => {
     const names = bulkInput
@@ -31,6 +33,7 @@ export default function Home() {
   const clearAll = () => {
     setStudents([]);
     setSelectedStudents([]);
+    setShowResult(false);
   };
 
   const chooseStudents = () => {
@@ -38,33 +41,120 @@ export default function Home() {
 
     const count = Math.min(selectCount, students.length);
     setIsSelecting(true);
+    setShowResult(false);
     setSelectedStudents([]);
+    setHighlightedStudent(null);
 
     let tick = 0;
-    const maxTicks = 20;
+    const maxTicks = 25;
     const interval = setInterval(() => {
       const randomIndex = Math.floor(Math.random() * students.length);
-      setSelectedStudents([students[randomIndex]]);
+      setHighlightedStudent(students[randomIndex]);
       tick++;
 
       if (tick >= maxTicks) {
         clearInterval(interval);
         const shuffled = [...students].sort(() => Math.random() - 0.5);
-        setSelectedStudents(shuffled.slice(0, count));
+        const winners = shuffled.slice(0, count);
+        setSelectedStudents(winners);
+        setHighlightedStudent(null);
         setIsSelecting(false);
+        setShowResult(true);
 
         // Confetti burst
         confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.5 },
         });
+        setTimeout(() => {
+          confetti({
+            particleCount: 50,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+          });
+          confetti({
+            particleCount: 50,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+          });
+        }, 200);
       }
-    }, 100);
+    }, 80);
+  };
+
+  const resetSelection = () => {
+    setShowResult(false);
+    setSelectedStudents([]);
   };
 
   const maxSelectable = Math.max(1, students.length);
 
+  // Show big result screen
+  if (showResult && selectedStudents.length > 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-violet-300 text-lg uppercase tracking-widest mb-6">
+            {selectedStudents.length === 1 ? "The chosen one is..." : `The chosen ${selectedStudents.length} are...`}
+          </p>
+          <div className="space-y-4 mb-12">
+            {selectedStudents.map((student, index) => (
+              <div
+                key={student}
+                className="bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-500 text-transparent bg-clip-text"
+              >
+                <p className="text-7xl md:text-8xl font-black">
+                  {selectedStudents.length > 1 && <span className="text-white/50">{index + 1}. </span>}
+                  {student}
+                </p>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={resetSelection}
+            className="px-8 py-4 bg-white/20 text-white text-xl font-bold rounded-2xl hover:bg-white/30 transition-colors"
+          >
+            Choose Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show selection animation screen
+  if (isSelecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-black text-white mb-2">Choosing...</h1>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+            <div className="flex flex-wrap justify-center gap-3">
+              {students.map((student) => (
+                <div
+                  key={student}
+                  className={`px-6 py-3 rounded-full text-xl font-bold transition-all duration-100 ${
+                    highlightedStudent === student
+                      ? "bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-500 text-white scale-125 shadow-lg shadow-orange-500/50"
+                      : "bg-white/20 text-white/60"
+                  }`}
+                >
+                  {student}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -76,41 +166,14 @@ export default function Home() {
           <p className="text-violet-200 text-lg">Random selection made fun</p>
         </div>
 
-        {/* Main Selection Display */}
+        {/* Choose Section */}
         <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-6 border border-white/20">
-          <div className="min-h-[200px] flex flex-col items-center justify-center">
-            {selectedStudents.length > 0 && !isSelecting ? (
-              <>
-                <p className="text-violet-200 text-sm uppercase tracking-widest mb-4">
-                  {selectedStudents.length === 1 ? "Selected" : `Selected ${selectedStudents.length}`}
-                </p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  {selectedStudents.map((student, index) => (
-                    <div
-                      key={student}
-                      className="bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-500 text-transparent bg-clip-text"
-                    >
-                      <p className={selectedStudents.length === 1 ? "text-6xl font-black" : "text-4xl font-black"}>
-                        {selectedStudents.length > 1 && `${index + 1}. `}{student}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : isSelecting ? (
-              <>
-                <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mb-4" />
-                <p className="text-3xl font-bold text-white/80">
-                  {selectedStudents[0] || "..."}
-                </p>
-              </>
-            ) : (
-              <p className="text-violet-200 text-xl">
-                {students.length === 0
-                  ? "Add students to get started"
-                  : "Click the button to choose"}
-              </p>
-            )}
+          <div className="min-h-[100px] flex flex-col items-center justify-center">
+            <p className="text-violet-200 text-xl">
+              {students.length === 0
+                ? "Add students to get started"
+                : "Ready to choose!"}
+            </p>
           </div>
 
           {/* Select Count */}
@@ -142,10 +205,10 @@ export default function Home() {
 
           <button
             onClick={chooseStudents}
-            disabled={students.length === 0 || isSelecting}
+            disabled={students.length === 0}
             className="w-full py-5 bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white text-2xl font-bold rounded-2xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-pink-500/30"
           >
-            {isSelecting ? "Choosing..." : selectCount === 1 ? "Choose a Student" : `Choose ${selectCount} Students`}
+            {selectCount === 1 ? "Choose a Student" : `Choose ${selectCount} Students`}
           </button>
         </div>
 
@@ -202,20 +265,12 @@ export default function Home() {
                   {students.map((student) => (
                     <div
                       key={student}
-                      className={`group flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        selectedStudents.includes(student)
-                          ? "bg-gradient-to-r from-pink-500 to-orange-400 text-white shadow-lg scale-105"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
+                      className="group flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
                     >
                       <span>{student}</span>
                       <button
                         onClick={() => removeStudent(student)}
-                        className={`w-5 h-5 flex items-center justify-center rounded-full text-xs transition-colors ${
-                          selectedStudents.includes(student)
-                            ? "bg-white/20 hover:bg-white/30 text-white"
-                            : "bg-gray-300 hover:bg-red-400 text-gray-600 hover:text-white"
-                        }`}
+                        className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-300 hover:bg-red-400 text-gray-600 hover:text-white transition-colors"
                       >
                         ×
                       </button>
