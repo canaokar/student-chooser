@@ -1,16 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
 
 export default function Home() {
   const [students, setStudents] = useState<string[]>([]);
+  const [usedStudents, setUsedStudents] = useState<string[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load students from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("students");
+    if (saved) {
+      setStudents(JSON.parse(saved));
+    }
+    const savedUsed = localStorage.getItem("usedStudents");
+    if (savedUsed) {
+      setUsedStudents(JSON.parse(savedUsed));
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save students to localStorage when changed
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("students", JSON.stringify(students));
+    }
+  }, [students, isLoaded]);
+
+  // Save used students to localStorage when changed
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("usedStudents", JSON.stringify(usedStudents));
+    }
+  }, [usedStudents, isLoaded]);
+
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [bulkInput, setBulkInput] = useState("");
   const [selectCount, setSelectCount] = useState(1);
   const [highlightedStudent, setHighlightedStudent] = useState<string | null>(null);
+
+  const availableStudents = students.filter((s) => !usedStudents.includes(s));
 
   const importStudents = () => {
     const names = bulkInput
@@ -25,6 +57,7 @@ export default function Home() {
 
   const removeStudent = (name: string) => {
     setStudents(students.filter((s) => s !== name));
+    setUsedStudents(usedStudents.filter((s) => s !== name));
     if (selectedStudents.includes(name)) {
       setSelectedStudents(selectedStudents.filter((s) => s !== name));
     }
@@ -32,14 +65,19 @@ export default function Home() {
 
   const clearAll = () => {
     setStudents([]);
+    setUsedStudents([]);
     setSelectedStudents([]);
     setShowResult(false);
   };
 
-  const chooseStudents = () => {
-    if (students.length === 0) return;
+  const resetUsed = () => {
+    setUsedStudents([]);
+  };
 
-    const count = Math.min(selectCount, students.length);
+  const chooseStudents = () => {
+    if (availableStudents.length === 0) return;
+
+    const count = Math.min(selectCount, availableStudents.length);
     setIsSelecting(true);
     setShowResult(false);
     setSelectedStudents([]);
@@ -48,15 +86,16 @@ export default function Home() {
     let tick = 0;
     const maxTicks = 25;
     const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * students.length);
-      setHighlightedStudent(students[randomIndex]);
+      const randomIndex = Math.floor(Math.random() * availableStudents.length);
+      setHighlightedStudent(availableStudents[randomIndex]);
       tick++;
 
       if (tick >= maxTicks) {
         clearInterval(interval);
-        const shuffled = [...students].sort(() => Math.random() - 0.5);
+        const shuffled = [...availableStudents].sort(() => Math.random() - 0.5);
         const winners = shuffled.slice(0, count);
         setSelectedStudents(winners);
+        setUsedStudents([...usedStudents, ...winners]);
         setHighlightedStudent(null);
         setIsSelecting(false);
         setShowResult(true);
@@ -90,7 +129,7 @@ export default function Home() {
     setSelectedStudents([]);
   };
 
-  const maxSelectable = Math.max(1, students.length);
+  const maxSelectable = Math.max(1, availableStudents.length);
 
   // Show big result screen
   if (showResult && selectedStudents.length > 0) {
@@ -135,7 +174,7 @@ export default function Home() {
 
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
             <div className="flex flex-wrap justify-center gap-3">
-              {students.map((student) => (
+              {availableStudents.map((student) => (
                 <div
                   key={student}
                   className={`px-6 py-3 rounded-full text-xl font-bold transition-all duration-100 ${
@@ -169,11 +208,23 @@ export default function Home() {
         {/* Choose Section */}
         <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-6 border border-white/20">
           <div className="min-h-[100px] flex flex-col items-center justify-center">
-            <p className="text-violet-200 text-xl">
-              {students.length === 0
-                ? "Add students to get started"
-                : "Ready to choose!"}
-            </p>
+            {students.length === 0 ? (
+              <p className="text-violet-200 text-xl">Add students to get started</p>
+            ) : availableStudents.length === 0 ? (
+              <div className="text-center">
+                <p className="text-violet-200 text-xl mb-4">All students have been chosen!</p>
+                <button
+                  onClick={resetUsed}
+                  className="px-6 py-3 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition-colors"
+                >
+                  Reset and Start Over
+                </button>
+              </div>
+            ) : (
+              <p className="text-violet-200 text-xl">
+                {availableStudents.length} of {students.length} students available
+              </p>
+            )}
           </div>
 
           {/* Select Count */}
@@ -205,7 +256,7 @@ export default function Home() {
 
           <button
             onClick={chooseStudents}
-            disabled={students.length === 0}
+            disabled={availableStudents.length === 0}
             className="w-full py-5 bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white text-2xl font-bold rounded-2xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-pink-500/30"
           >
             {selectCount === 1 ? "Choose a Student" : `Choose ${selectCount} Students`}
@@ -240,17 +291,27 @@ export default function Home() {
               <h2 className="text-lg font-bold text-gray-800">
                 Students
                 <span className="ml-2 px-2 py-1 bg-violet-100 text-violet-700 text-sm rounded-full">
-                  {students.length}
+                  {availableStudents.length}/{students.length}
                 </span>
               </h2>
-              {students.length > 0 && (
-                <button
-                  onClick={clearAll}
-                  className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
-                >
-                  Clear all
-                </button>
-              )}
+              <div className="flex gap-2">
+                {usedStudents.length > 0 && (
+                  <button
+                    onClick={resetUsed}
+                    className="text-sm text-violet-500 hover:text-violet-700 font-medium transition-colors"
+                  >
+                    Reset used
+                  </button>
+                )}
+                {students.length > 0 && (
+                  <button
+                    onClick={clearAll}
+                    className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="h-[140px] overflow-y-auto">
@@ -262,20 +323,27 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {students.map((student) => (
-                    <div
-                      key={student}
-                      className="group flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
-                    >
-                      <span>{student}</span>
-                      <button
-                        onClick={() => removeStudent(student)}
-                        className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-300 hover:bg-red-400 text-gray-600 hover:text-white transition-colors"
+                  {students.map((student) => {
+                    const isUsed = usedStudents.includes(student);
+                    return (
+                      <div
+                        key={student}
+                        className={`group flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          isUsed
+                            ? "bg-gray-200 text-gray-400 line-through"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <span>{student}</span>
+                        <button
+                          onClick={() => removeStudent(student)}
+                          className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-300 hover:bg-red-400 text-gray-600 hover:text-white transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
