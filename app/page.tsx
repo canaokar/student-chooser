@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import confetti from "canvas-confetti";
 
 export default function Home() {
   const [students, setStudents] = useState<string[]>([]);
   const [usedStudents, setUsedStudents] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const [selectionHistory, setSelectionHistory] = useState<string[]>([]);
 
   // Load students from localStorage on mount
   useEffect(() => {
@@ -17,6 +20,10 @@ export default function Home() {
     const savedUsed = localStorage.getItem("usedStudents");
     if (savedUsed) {
       setUsedStudents(JSON.parse(savedUsed));
+    }
+    const savedHistory = localStorage.getItem("selectionHistory");
+    if (savedHistory) {
+      setSelectionHistory(JSON.parse(savedHistory));
     }
     setIsLoaded(true);
   }, []);
@@ -34,6 +41,13 @@ export default function Home() {
       localStorage.setItem("usedStudents", JSON.stringify(usedStudents));
     }
   }, [usedStudents, isLoaded]);
+
+  // Save selection history to localStorage when changed
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("selectionHistory", JSON.stringify(selectionHistory));
+    }
+  }, [selectionHistory, isLoaded]);
 
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [lastSelectedStudents, setLastSelectedStudents] = useState<string[]>([]);
@@ -124,7 +138,12 @@ export default function Home() {
     setUsedStudents([]);
     setSelectedStudents([]);
     setLastSelectedStudents([]);
+    setSelectionHistory([]);
     setShowResult(false);
+  };
+
+  const clearHistory = () => {
+    setSelectionHistory([]);
   };
 
   const resetUsed = () => {
@@ -163,6 +182,7 @@ export default function Home() {
         setSelectedStudents(winners);
         setLastSelectedStudents(winners);
         setUsedStudents((prev) => [...prev, ...winners]);
+        setSelectionHistory((prev) => [...winners, ...prev].slice(0, 20));
         setHighlightedStudent(null);
         setIsSelecting(false);
         setShowResult(true);
@@ -576,6 +596,60 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Selection History & Team Generator */}
+        <div className="grid md:grid-cols-2 gap-6 mt-6">
+          {/* Selection History */}
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-bold text-gray-800">
+                Selection History
+              </h2>
+              {selectionHistory.length > 0 && (
+                <button
+                  onClick={clearHistory}
+                  className="text-sm text-gray-400 hover:text-red-500 font-medium transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="h-[100px] overflow-y-auto">
+              {selectionHistory.length === 0 ? (
+                <p className="text-gray-400 text-center py-4 text-sm">
+                  No selections yet
+                </p>
+              ) : (
+                <ol className="space-y-1">
+                  {selectionHistory.map((student, index) => (
+                    <li key={`${student}-${index}`} className="flex items-center gap-2 text-sm">
+                      <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-xs flex items-center justify-center font-medium">
+                        {index + 1}
+                      </span>
+                      <span className="text-gray-700">{student}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+
+          {/* Team Generator Link */}
+          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-xl p-6 flex flex-col justify-center">
+            <h2 className="text-lg font-bold text-white mb-2">
+              Need Teams?
+            </h2>
+            <p className="text-indigo-100 text-sm mb-4">
+              Randomly divide your students into teams for group activities.
+            </p>
+            <Link
+              href="/teams"
+              className="inline-block px-6 py-3 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors text-center"
+            >
+              Team Generator →
+            </Link>
           </div>
         </div>
 
