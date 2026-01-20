@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import confetti from "canvas-confetti";
 
 export default function Home() {
@@ -36,13 +36,69 @@ export default function Home() {
   }, [usedStudents, isLoaded]);
 
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [lastSelectedStudents, setLastSelectedStudents] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [bulkInput, setBulkInput] = useState("");
   const [selectCount, setSelectCount] = useState(1);
   const [highlightedStudent, setHighlightedStudent] = useState<string | null>(null);
+  const [fullScreen, setFullScreen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const availableStudents = students.filter((s) => !usedStudents.includes(s));
+
+  // Initialize audio context
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  // Play drumroll sound
+  const playDrumroll = useCallback(() => {
+    if (!soundEnabled) return;
+    const ctx = getAudioContext();
+    const duration = 2;
+    const startTime = ctx.currentTime;
+
+    for (let i = 0; i < 40; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 100 + Math.random() * 50;
+      osc.type = "triangle";
+      const time = startTime + (i * duration) / 40;
+      gain.gain.setValueAtTime(0.1, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+  }, [soundEnabled, getAudioContext]);
+
+  // Play celebration sound
+  const playCelebration = useCallback(() => {
+    if (!soundEnabled) return;
+    const ctx = getAudioContext();
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      const startTime = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0.2, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+      osc.start(startTime);
+      osc.stop(startTime + 0.3);
+    });
+  }, [soundEnabled, getAudioContext]);
 
   const importStudents = () => {
     const names = bulkInput
@@ -67,21 +123,31 @@ export default function Home() {
     setStudents([]);
     setUsedStudents([]);
     setSelectedStudents([]);
+    setLastSelectedStudents([]);
     setShowResult(false);
   };
 
   const resetUsed = () => {
     setUsedStudents([]);
+    setLastSelectedStudents([]);
   };
 
-  const chooseStudents = () => {
-    if (availableStudents.length === 0) return;
+  const undoLastPick = () => {
+    if (lastSelectedStudents.length === 0) return;
+    setUsedStudents(usedStudents.filter((s) => !lastSelectedStudents.includes(s)));
+    setLastSelectedStudents([]);
+  };
+
+  const chooseStudents = useCallback(() => {
+    if (availableStudents.length === 0 || isSelecting) return;
 
     const count = Math.min(selectCount, availableStudents.length);
     setIsSelecting(true);
     setShowResult(false);
     setSelectedStudents([]);
     setHighlightedStudent(null);
+
+    playDrumroll();
 
     let tick = 0;
     const maxTicks = 25;
@@ -95,10 +161,13 @@ export default function Home() {
         const shuffled = [...availableStudents].sort(() => Math.random() - 0.5);
         const winners = shuffled.slice(0, count);
         setSelectedStudents(winners);
-        setUsedStudents([...usedStudents, ...winners]);
+        setLastSelectedStudents(winners);
+        setUsedStudents((prev) => [...prev, ...winners]);
         setHighlightedStudent(null);
         setIsSelecting(false);
         setShowResult(true);
+
+        playCelebration();
 
         // Confetti burst
         confetti({
@@ -122,7 +191,29 @@ export default function Home() {
         }, 200);
       }
     }, 80);
-  };
+  }, [availableStudents, isSelecting, selectCount, playDrumroll, playCelebration]);
+
+  // Keyboard shortcut (spacebar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isSelecting && availableStudents.length > 0) {
+        // Don't trigger if typing in textarea
+        if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+          return;
+        }
+        e.preventDefault();
+        if (showResult) {
+          setShowResult(false);
+          setSelectedStudents([]);
+        } else {
+          chooseStudents();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [chooseStudents, isSelecting, availableStudents.length, showResult]);
 
   const resetSelection = () => {
     setShowResult(false);
@@ -152,12 +243,21 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <button
-            onClick={resetSelection}
-            className="px-8 py-4 bg-white/20 text-white text-xl font-bold rounded-2xl hover:bg-white/30 transition-colors"
-          >
-            Choose Again
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={undoLastPick}
+              className="px-6 py-3 bg-white/10 text-white/70 font-semibold rounded-xl hover:bg-white/20 transition-colors"
+            >
+              Undo Pick
+            </button>
+            <button
+              onClick={resetSelection}
+              className="px-8 py-4 bg-white/20 text-white text-xl font-bold rounded-2xl hover:bg-white/30 transition-colors"
+            >
+              Choose Again
+            </button>
+          </div>
+          <p className="text-violet-300/50 text-sm mt-8">Press spacebar to continue</p>
         </div>
       </div>
     );
@@ -193,6 +293,106 @@ export default function Home() {
     );
   }
 
+  // Full screen mode
+  if (fullScreen) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4 flex flex-col">
+        <div className="flex justify-between items-center mb-8 max-w-4xl mx-auto w-full">
+          <h1 className="text-3xl font-black text-white">Student Chooser</h1>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors"
+            >
+              {soundEnabled ? "🔊" : "🔇"}
+            </button>
+            <button
+              onClick={() => setFullScreen(false)}
+              className="px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors"
+            >
+              Exit Full Screen
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-2xl w-full mx-auto">
+            <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+              <div className="min-h-[120px] flex flex-col items-center justify-center mb-6">
+                {students.length === 0 ? (
+                  <p className="text-violet-200 text-xl">No students loaded</p>
+                ) : availableStudents.length === 0 ? (
+                  <div className="text-center">
+                    <p className="text-violet-200 text-xl mb-4">All students have been chosen!</p>
+                    <button
+                      onClick={resetUsed}
+                      className="px-6 py-3 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition-colors"
+                    >
+                      Reset and Start Over
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-violet-200 text-2xl mb-2">
+                      {availableStudents.length} of {students.length} students available
+                    </p>
+                    {lastSelectedStudents.length > 0 && (
+                      <button
+                        onClick={undoLastPick}
+                        className="text-violet-300 hover:text-white text-sm transition-colors"
+                      >
+                        Undo last pick ({lastSelectedStudents.join(", ")})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Select Count */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <span className="text-white font-medium">Choose</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectCount(Math.max(1, selectCount - 1))}
+                    disabled={selectCount <= 1}
+                    className="w-12 h-12 rounded-full bg-white/20 text-white font-bold text-2xl hover:bg-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    -
+                  </button>
+                  <span className="w-16 text-center text-3xl font-bold text-white">
+                    {selectCount}
+                  </span>
+                  <button
+                    onClick={() => setSelectCount(Math.min(maxSelectable, selectCount + 1))}
+                    disabled={selectCount >= maxSelectable}
+                    className="w-12 h-12 rounded-full bg-white/20 text-white font-bold text-2xl hover:bg-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+                <span className="text-white font-medium">
+                  {selectCount === 1 ? "student" : "students"}
+                </span>
+              </div>
+
+              <button
+                onClick={chooseStudents}
+                disabled={availableStudents.length === 0}
+                className="w-full py-6 bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white text-3xl font-bold rounded-2xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-pink-500/30"
+              >
+                {selectCount === 1 ? "Choose a Student" : `Choose ${selectCount} Students`}
+              </button>
+
+              <p className="text-center text-violet-300/50 text-sm mt-4">
+                Press spacebar to choose
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Default screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4">
@@ -221,9 +421,19 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <p className="text-violet-200 text-xl">
-                {availableStudents.length} of {students.length} students available
-              </p>
+              <div className="text-center">
+                <p className="text-violet-200 text-xl">
+                  {availableStudents.length} of {students.length} students available
+                </p>
+                {lastSelectedStudents.length > 0 && (
+                  <button
+                    onClick={undoLastPick}
+                    className="text-violet-300 hover:text-white text-sm mt-2 transition-colors"
+                  >
+                    Undo last pick ({lastSelectedStudents.join(", ")})
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -261,6 +471,25 @@ export default function Home() {
           >
             {selectCount === 1 ? "Choose a Student" : `Choose ${selectCount} Students`}
           </button>
+
+          <div className="flex justify-center gap-4 mt-4">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="px-4 py-2 bg-white/10 text-violet-200 text-sm rounded-lg hover:bg-white/20 transition-colors"
+            >
+              Sound: {soundEnabled ? "On" : "Off"}
+            </button>
+            <button
+              onClick={() => setFullScreen(true)}
+              className="px-4 py-2 bg-white/10 text-violet-200 text-sm rounded-lg hover:bg-white/20 transition-colors"
+            >
+              Full Screen Mode
+            </button>
+          </div>
+
+          <p className="text-center text-violet-300/50 text-sm mt-3">
+            Press spacebar to choose
+          </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
