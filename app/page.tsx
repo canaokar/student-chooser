@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import confetti from "canvas-confetti";
 
 export default function Home() {
   const [students, setStudents] = useState<string[]>([]);
@@ -42,17 +43,22 @@ export default function Home() {
     let tick = 0;
     const maxTicks = 20;
     const interval = setInterval(() => {
-      // Show random name during animation
       const randomIndex = Math.floor(Math.random() * students.length);
       setSelectedStudents([students[randomIndex]]);
       tick++;
 
       if (tick >= maxTicks) {
         clearInterval(interval);
-        // Final selection - pick multiple unique students
         const shuffled = [...students].sort(() => Math.random() - 0.5);
         setSelectedStudents(shuffled.slice(0, count));
         setIsSelecting(false);
+
+        // Confetti burst
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
       }
     }, 100);
   };
