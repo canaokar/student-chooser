@@ -17,8 +17,8 @@ export default function ClassTimer() {
   // UI state
   const [isLoaded, setIsLoaded] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [manualMinutes, setManualMinutes] = useState<string>("");
-  const [manualSeconds, setManualSeconds] = useState<string>("");
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [timeInput, setTimeInput] = useState<string>("");
 
   // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -210,32 +210,85 @@ export default function ClassTimer() {
     setShowCompletionScreen(false);
   };
 
-  // Handle manual time entry
-  const handleManualSet = () => {
-    const mins = parseInt(manualMinutes) || 0;
-    const secs = parseInt(manualSeconds) || 0;
+  // Handle clicking on timer to edit
+  const handleTimerClick = () => {
+    if (isRunning) return;
+    const mins = Math.floor(timeRemaining / 60);
+    const secs = timeRemaining % 60;
+    setTimeInput(formatTime(timeRemaining));
+    setIsEditingTime(true);
+  };
 
-    if (mins < 0 || secs < 0 || secs >= 60) return;
+  // Parse time input (accepts formats like "5:30", "05:30", "10", "0:45")
+  const parseTimeInput = (input: string): number => {
+    const trimmed = input.trim();
+    if (!trimmed) return 0;
 
-    const totalSeconds = mins * 60 + secs;
+    // Check if it contains a colon (MM:SS format)
+    if (trimmed.includes(':')) {
+      const [minStr, secStr] = trimmed.split(':');
+      const mins = parseInt(minStr) || 0;
+      const secs = parseInt(secStr) || 0;
+      if (mins < 0 || secs < 0 || secs >= 60) return 0;
+      return mins * 60 + secs;
+    } else {
+      // Just minutes
+      const mins = parseInt(trimmed) || 0;
+      if (mins < 0) return 0;
+      return mins * 60;
+    }
+  };
+
+  // Handle saving edited time
+  const handleSaveTime = () => {
+    const totalSeconds = parseTimeInput(timeInput);
     if (totalSeconds === 0) return;
 
     handlePreset(totalSeconds);
-    setManualMinutes("");
-    setManualSeconds("");
+    setIsEditingTime(false);
+    setTimeInput("");
   };
 
-  // Preset buttons
-  const presets = [
+  // Handle canceling edit
+  const handleCancelEdit = () => {
+    setIsEditingTime(false);
+    setTimeInput("");
+  };
+
+  // Handle key press in time input
+  const handleTimeInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSaveTime();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
+
+  // Combined presets with title and duration
+  const combinedPresets = [
+    { title: "Short Break", seconds: 300, icon: "☕" },
+    { title: "Lunch Break", seconds: 1800, icon: "🍽️" },
+    { title: "Group Discussion", seconds: 900, icon: "💬" },
+    { title: "Quiz Time", seconds: 600, icon: "📝" },
+    { title: "Work Time", seconds: 1500, icon: "💼" },
+    { title: "Reading Time", seconds: 1200, icon: "📚" },
+  ];
+
+  // Quick time presets (no title)
+  const quickTimePresets = [
     { label: "1 min", seconds: 60 },
     { label: "5 min", seconds: 300 },
     { label: "10 min", seconds: 600 },
     { label: "15 min", seconds: 900 },
-    { label: "20 min", seconds: 1200 },
     { label: "30 min", seconds: 1800 },
-    { label: "45 min", seconds: 2700 },
     { label: "60 min", seconds: 3600 },
   ];
+
+  // Handle combined preset
+  const handleCombinedPreset = (title: string, seconds: number) => {
+    setTitle(title);
+    handlePreset(seconds);
+  };
 
   // Calculate progress percentage
   const progressPercentage = duration > 0 ? ((duration - timeRemaining) / duration) * 100 : 0;
@@ -249,16 +302,16 @@ export default function ClassTimer() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 py-8 px-4 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-8xl mb-6">⏰</div>
-          <h2 className="text-5xl md:text-6xl font-black text-white mb-4">Time&apos;s Up!</h2>
-          {title && <p className="text-2xl text-white/90 mb-8">{title}</p>}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="text-7xl mb-4">⏰</div>
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-3">Time&apos;s Up!</h2>
+          {title && <p className="text-xl text-white/90 mb-6">{title}</p>}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => {
                 setShowCompletionScreen(false);
                 resetTimer();
               }}
-              className="px-8 py-4 bg-white/20 backdrop-blur-lg text-white text-xl font-bold rounded-2xl hover:bg-white/30 transition-colors border border-white/30"
+              className="px-6 py-3 bg-white/20 backdrop-blur-lg text-white text-lg font-bold rounded-xl hover:bg-white/30 transition-colors border border-white/30"
             >
               Start New Timer
             </button>
@@ -268,7 +321,7 @@ export default function ClassTimer() {
                 setTimeRemaining(duration);
                 startTimer();
               }}
-              className="px-8 py-4 bg-white text-orange-600 text-xl font-bold rounded-2xl hover:bg-white/90 transition-colors shadow-lg"
+              className="px-6 py-3 bg-white text-orange-600 text-lg font-bold rounded-xl hover:bg-white/90 transition-colors shadow-lg"
             >
               Repeat Timer
             </button>
@@ -280,25 +333,25 @@ export default function ClassTimer() {
 
   // Main timer screen
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 py-8 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 py-6 px-4 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-orange-400/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-pink-400/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-2xl mx-auto relative z-10">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-4">
           <Link
             href="/"
-            className="text-white/80 hover:text-white transition-colors flex items-center gap-2 text-lg font-medium"
+            className="text-white/80 hover:text-white transition-colors flex items-center gap-2 font-medium"
           >
             <span>← Back to Dashboard</span>
           </Link>
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="text-3xl hover:scale-110 transition-transform"
+            className="text-2xl hover:scale-110 transition-transform"
             title={soundEnabled ? "Sound On" : "Sound Off"}
           >
             {soundEnabled ? "🔊" : "🔇"}
@@ -306,28 +359,65 @@ export default function ClassTimer() {
         </div>
 
         {/* Title */}
-        <h1 className="text-4xl md:text-5xl font-black text-white text-center mb-8">
+        <h1 className="text-3xl md:text-4xl font-black text-white text-center mb-6">
           Class Timer ⏱️
         </h1>
 
         {/* Timer Display Card */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 mb-6">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-4">
           <div className="text-center">
-            {/* Timer Display */}
-            <div className={`text-7xl md:text-8xl font-black ${timerColorClass} mb-4 font-mono`}>
-              {formatTime(timeRemaining)}
-            </div>
+            {/* Title Display - Show Above Timer */}
+            {title && !isEditingTime && (
+              <div className="text-xl md:text-2xl text-white/90 font-bold mb-3">{title}</div>
+            )}
 
-            {/* Title Display */}
-            {title && (
-              <div className="text-2xl text-white/90 font-medium mb-4">{title}</div>
+            {/* Timer Display */}
+            {isEditingTime ? (
+              <div className="mb-3">
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={timeInput}
+                    onChange={(e) => setTimeInput(e.target.value)}
+                    onKeyDown={handleTimeInputKeyPress}
+                    placeholder="MM:SS or MM"
+                    autoFocus
+                    className="w-full max-w-sm mx-auto px-4 py-3 bg-white/20 border-2 border-white/40 rounded-xl text-white text-4xl font-mono text-center placeholder-white/50 focus:outline-none focus:border-white focus:bg-white/25 transition-all"
+                  />
+                  <p className="text-white/60 text-xs mt-2">Enter time as 5:30 or just 10 for 10 minutes</p>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={handleSaveTime}
+                    className="px-6 py-2 bg-white text-orange-600 font-bold rounded-lg hover:bg-white/90 transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    Set Time
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="px-6 py-2 bg-white/20 text-white font-bold rounded-lg hover:bg-white/30 transition-all border border-white/30"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={handleTimerClick}
+                className={`text-6xl md:text-7xl font-black ${timerColorClass} mb-3 font-mono ${
+                  !isRunning ? "cursor-pointer hover:scale-105 transition-transform" : ""
+                }`}
+                title={!isRunning ? "Click to edit time" : ""}
+              >
+                {formatTime(timeRemaining)}
+              </div>
             )}
 
             {/* Progress Bar */}
-            {duration > 0 && (
-              <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+            {duration > 0 && !isEditingTime && (
+              <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden shadow-inner">
                 <div
-                  className="h-full bg-white transition-all duration-1000 ease-linear"
+                  className="h-full bg-gradient-to-r from-white to-white/80 transition-all duration-1000 ease-linear shadow-sm"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -335,113 +425,107 @@ export default function ClassTimer() {
           </div>
         </div>
 
-        {/* Controls Card */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 mb-6">
-          {/* Title Input */}
-          <div className="mb-6">
-            <label className="block text-white font-bold mb-2 text-lg">Timer Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Short Break, Group Discussion, Quiz Time"
-              disabled={isRunning}
-              className="w-full px-4 py-3 bg-white/20 border-2 border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:border-white/50 transition-colors disabled:opacity-50"
-            />
+        {/* Start Button - Always Prominent */}
+        {!isRunning && !isPaused && !isEditingTime && duration > 0 && (
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={startTimer}
+              className="px-12 py-4 bg-gradient-to-r from-green-400 to-green-500 text-white font-black text-xl rounded-xl hover:from-green-500 hover:to-green-600 transition-all duration-200 shadow-2xl hover:shadow-green-500/50 hover:scale-[1.05] active:scale-[0.95] border-2 border-green-300/50"
+            >
+              ▶ Start Timer
+            </button>
           </div>
+        )}
 
-          {/* Manual Time Entry */}
-          <div className="mb-6">
-            <label className="block text-white font-bold mb-2 text-lg">Set Custom Time</label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="number"
-                value={manualMinutes}
-                onChange={(e) => setManualMinutes(e.target.value)}
-                placeholder="Minutes"
-                min="0"
-                disabled={isRunning}
-                className="flex-1 px-4 py-3 bg-white/20 border-2 border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:border-white/50 transition-colors disabled:opacity-50"
-              />
-              <input
-                type="number"
-                value={manualSeconds}
-                onChange={(e) => setManualSeconds(e.target.value)}
-                placeholder="Seconds"
-                min="0"
-                max="59"
-                disabled={isRunning}
-                className="flex-1 px-4 py-3 bg-white/20 border-2 border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:border-white/50 transition-colors disabled:opacity-50"
-              />
-              <button
-                onClick={handleManualSet}
-                disabled={isRunning || (!manualMinutes && !manualSeconds)}
-                className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/30"
-              >
-                Set
-              </button>
+        {/* Quick Start Presets */}
+        {!isRunning && !isPaused && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-4">
+            <h2 className="text-lg font-bold text-white mb-3">Quick Start</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {combinedPresets.map((preset) => (
+                <button
+                  key={preset.title}
+                  onClick={() => handleCombinedPreset(preset.title, preset.seconds)}
+                  className="group relative px-4 py-4 bg-white/15 hover:bg-white/25 text-white rounded-xl transition-all duration-200 border border-white/20 hover:border-white/40 hover:scale-[1.03] active:scale-[0.98]"
+                >
+                  <div className="text-3xl mb-1">{preset.icon}</div>
+                  <div className="font-bold text-base mb-0.5">{preset.title}</div>
+                  <div className="text-white/70 text-xs">
+                    {Math.floor(preset.seconds / 60)} min
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Preset Buttons */}
-          <div className="mb-6">
-            <label className="block text-white font-bold mb-2 text-lg">Quick Presets</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {presets.map((preset) => (
+        {/* Custom Setup */}
+        {!isRunning && !isPaused && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-4">
+            <h2 className="text-lg font-bold text-white mb-3">Custom Timer</h2>
+
+            {/* Message Input */}
+            <div className="mb-3">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Timer message (optional)"
+                className="w-full px-3 py-2 bg-white/20 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-white/50 focus:bg-white/25 transition-all"
+              />
+            </div>
+
+            {/* Quick Time Buttons */}
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+              {quickTimePresets.map((preset) => (
                 <button
                   key={preset.seconds}
                   onClick={() => handlePreset(preset.seconds)}
-                  disabled={isRunning}
-                  className="px-4 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border border-white/30 hover:scale-[1.02] active:scale-[0.98]"
+                  className="px-3 py-2 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-lg transition-all duration-200 border border-white/30 hover:scale-[1.05] active:scale-[0.95] text-sm"
                 >
                   {preset.label}
                 </button>
               ))}
             </div>
+            <p className="text-white/60 text-xs mt-2 text-center">
+              Or click the timer above to enter a custom time
+            </p>
           </div>
+        )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {!isRunning && !isPaused && (
-              <button
-                onClick={startTimer}
-                disabled={duration === 0}
-                className="flex-1 px-6 py-4 bg-white text-orange-600 font-black text-xl rounded-2xl hover:bg-white/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Start Timer
-              </button>
-            )}
-
+        {/* Running Timer Controls */}
+        {(isRunning || isPaused) && (
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             {isRunning && (
               <button
                 onClick={pauseTimer}
-                className="flex-1 px-6 py-4 bg-white text-orange-600 font-black text-xl rounded-2xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                className="flex-1 px-6 py-3 bg-white text-orange-600 font-bold text-lg rounded-xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:scale-[1.02] active:scale-[0.98]"
               >
-                Pause
+                ⏸ Pause
               </button>
             )}
 
             {isPaused && (
               <button
                 onClick={resumeTimer}
-                className="flex-1 px-6 py-4 bg-white text-orange-600 font-black text-xl rounded-2xl hover:bg-white/90 transition-all duration-200 shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-green-400 to-green-500 text-white font-bold text-lg rounded-xl hover:from-green-500 hover:to-green-600 transition-all duration-200 shadow-lg hover:scale-[1.02] active:scale-[0.98] border-2 border-green-300/50"
               >
-                Resume
+                ▶ Resume
               </button>
             )}
 
-            {(isRunning || isPaused) && (
-              <button
-                onClick={resetTimer}
-                className="flex-1 px-6 py-4 bg-white/20 text-white font-bold text-xl rounded-2xl hover:bg-white/30 transition-all duration-200 border border-white/30 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Reset
-              </button>
-            )}
+            <button
+              onClick={resetTimer}
+              className="flex-1 px-6 py-3 bg-white/20 text-white font-bold text-lg rounded-xl hover:bg-white/30 transition-all duration-200 border border-white/30 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              🔄 Reset
+            </button>
           </div>
-        </div>
+        )}
 
-        <Footer />
+        <div className="mt-4">
+          <Footer />
+        </div>
       </div>
     </div>
   );
