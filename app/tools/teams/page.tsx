@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import confetti from "canvas-confetti";
+import Footer from "../../components/Footer";
 
 const teamColors = [
   "from-red-500 to-orange-500",
@@ -26,7 +27,7 @@ const teamColorsBg = [
   "bg-rose-500",
 ];
 
-export default function TeamsPage() {
+export default function TeamGenerator() {
   const [students, setStudents] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [teamCount, setTeamCount] = useState(2);
@@ -112,33 +113,38 @@ export default function TeamsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 py-8 px-4">
       <div className="max-w-6xl mx-auto">
+        {/* Back Link */}
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-violet-200 hover:text-white transition-colors group"
+          >
+            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="font-medium">Back to Dashboard</span>
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-black text-white mb-1">Team Generator</h1>
             <p className="text-violet-200">Randomly divide students into teams</p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors"
-            >
-              {soundEnabled ? "🔊" : "🔇"}
-            </button>
-            <Link
-              href="/"
-              className="px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors"
-            >
-              ← Back to Chooser
-            </Link>
-          </div>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors"
+          >
+            {soundEnabled ? "🔊" : "🔇"}
+          </button>
         </div>
 
         {students.length === 0 ? (
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20 text-center">
             <p className="text-violet-200 text-xl mb-4">No students loaded</p>
             <Link
-              href="/"
+              href="/tools/selector"
               className="inline-block px-6 py-3 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition-colors"
             >
               Go add students first
@@ -236,29 +242,7 @@ export default function TeamsPage() {
           </>
         )}
 
-        {/* Footer */}
-        <footer className="mt-10 text-center">
-          <p className="text-violet-300 text-sm">
-            Made by{" "}
-            <a
-              href="https://github.com/canaokar"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white hover:text-pink-300 transition-colors"
-            >
-              @canaokar
-            </a>
-            {" · "}
-            <a
-              href="https://github.com/canaokar/student-chooser"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white hover:text-pink-300 transition-colors"
-            >
-              View on GitHub
-            </a>
-          </p>
-        </footer>
+        <Footer />
       </div>
     </div>
   );
