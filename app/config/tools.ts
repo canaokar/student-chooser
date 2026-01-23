@@ -25,4 +25,12 @@ export const tools: Tool[] = [
     path: "/tools/timer",
     gradient: "from-orange-500 via-red-500 to-pink-500",
   },
+  {
+    id: "feedback",
+    name: "Live Feedback",
+    description: "Collect real-time anonymous feedback during training sessions",
+    icon: "💬",
+    path: "/tools/feedback",
+    gradient: "from-emerald-500 via-teal-500 to-cyan-500",
+  },
 ];
